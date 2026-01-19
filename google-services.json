@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "776660008357",
+    "project_id": "escape-9ab42",
+    "storage_bucket": "escape-9ab42.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:776660008357:android:250d486afa5c338e557c4c",
+        "android_client_info": {
+          "package_name": "com.yognik.escape"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "776660008357-r0hv01q8fqrdch5cm8icvc8qemd7khtc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yognik.escape",
+            "certificate_hash": "14302badcd543bce1db3ebc68485e8c178fa0b86"
+          }
+        },
+        {
+          "client_id": "776660008357-gnau7nq0nij2v5mffoc2kqjgrbfkj880.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAmd2Du3pjWDdwcIesC1hcJyqRheMsPIHQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "776660008357-gnau7nq0nij2v5mffoc2kqjgrbfkj880.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
