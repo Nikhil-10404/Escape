@@ -16,6 +16,14 @@ import { useRouter } from "expo-router";
 import { login as loginAPI } from "../services/auth";
 import MagicalAlert from "../components/MagicalAlert";
 import { useLocalSearchParams } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+import * as Google from "expo-auth-session/providers/google";
+import * as AuthSession from "expo-auth-session";
+import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
+import { firebaseAuth } from "../config/firebase";
+import { firebaseGoogleLoginAPI } from "../services/auth";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -34,6 +42,44 @@ export default function LoginScreen() {
   message: "",
   });
   const [success, setSuccess] = useState(false);
+
+  const redirectUri = AuthSession.makeRedirectUri({
+  scheme: "escape",
+});
+
+const [request, response, promptAsync] = Google.useAuthRequest({
+  androidClientId: "776660008357-r0hv01q8fqrdch5cm8icvc8qemd7khtc.apps.googleusercontent.com",
+  webClientId: "776660008357-gnau7nq0nij2v5mffoc2kqjgrbfkj880.apps.googleusercontent.com",
+  redirectUri,
+});
+
+useEffect(() => {
+  const run = async () => {
+    if (response?.type !== "success") return;
+
+    try {
+      const idToken = response.params?.id_token;
+
+      if (!idToken) throw new Error("Google id_token missing");
+
+      const credential = GoogleAuthProvider.credential(idToken);
+      await signInWithCredential(firebaseAuth, credential);
+
+      await firebaseGoogleLoginAPI();
+
+      router.replace("/home");
+    } catch (err) {
+      console.log("Google login error:", err);
+    }
+  };
+
+  run();
+}, [response]);
+
+const googleLogin = async () => {
+  await promptAsync();
+};
+
 
 
   useEffect(() => {
@@ -180,6 +226,10 @@ export default function LoginScreen() {
 
 
         <Text style={styles.or}>or</Text>
+
+        <TouchableOpacity style={styles.googleBtn} onPress={googleLogin}> 
+          <Text style={styles.googleText}>Continue with Google 🪄</Text> 
+          </TouchableOpacity>
 
         <Text style={styles.footer}>
           New to magic? <Text style={styles.link} onPress={() => router.push("/signup")}>

@@ -1,6 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import axios from "axios";
 import { API } from "../config/api";
+import { firebaseAuth } from "../config/firebase";
 
 export async function signup(data: {
   fullName: string;
@@ -44,6 +45,18 @@ export const resendSignupOTP = (email: string) =>
 
 export const verifySignupOTP = (email: string, otp: string) =>
   axios.post(`${API}/verify-signup-otp`, { email, otp });
+
+export async function firebaseGoogleLoginAPI() {
+  const idToken = await firebaseAuth.currentUser?.getIdToken();
+
+  if (!idToken) throw new Error("Firebase ID token missing");
+
+  const res = await axios.post(`${API}/firebase-google-login`, { idToken });
+
+  await SecureStore.setItemAsync("token", res.data.token);
+
+  return res.data.user;
+}
 
 export async function getProfile() {
   const token = await getToken();
