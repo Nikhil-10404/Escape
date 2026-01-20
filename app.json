@@ -8,7 +8,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "escape",
     "extra": {
-      "API_BASE_URL": "http://10.254.19.198:5000",
+      "API_BASE_URL": "http://192.168.62.198:5000",
       "router": {},
       "eas": {
         "projectId": "6e019169-cd61-45c9-929d-b9a7846b84af"

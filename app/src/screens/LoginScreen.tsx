@@ -41,6 +41,7 @@ export default function LoginScreen() {
   message: "",
   });
   const [success, setSuccess] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   GoogleSignin.configure({
   webClientId:
@@ -48,13 +49,27 @@ export default function LoginScreen() {
 });
 
 async function googleLogin() {
+  if (googleLoading) return;
+
   try {
+    setGoogleLoading(true);
+
     await GoogleSignin.hasPlayServices();
 
-    const userInfo = await GoogleSignin.signIn();
-    const idToken = userInfo.data?.idToken;
+    // ✅ Force chooser every time (but don’t reset firebase first)
+    await GoogleSignin.signOut();
 
-    if (!idToken) throw new Error("Google idToken missing");
+    const userInfo = await GoogleSignin.signIn();
+
+    const idToken =
+      (userInfo as any)?.idToken ||
+      (userInfo as any)?.data?.idToken;
+
+    // ✅ User dismissed → smooth exit
+    if (!idToken) {
+      setGoogleLoading(false);
+      return;
+    }
 
     const credential = GoogleAuthProvider.credential(idToken);
     await signInWithCredential(firebaseAuth, credential);
@@ -68,16 +83,29 @@ async function googleLogin() {
     });
     setAlertAction("login-success");
   } catch (err: any) {
+    // ✅ cancel/dismiss -> do nothing (smooth)
+    if (
+      err?.code === "SIGN_IN_CANCELLED" ||
+      err?.message?.toLowerCase()?.includes("cancel") ||
+      err?.message?.toLowerCase()?.includes("dismiss")
+    ) {
+      return;
+    }
+
     console.log("Google Login error:", err);
 
     setAlert({
       visible: true,
       title: "Dark Magic Blocked",
-      message: err?.message || "Google login failed",
+      message: err?.response?.data?.error || err?.message || "Google login failed",
     });
     setAlertAction("error");
+  } finally {
+    setGoogleLoading(false);
   }
 }
+
+
 
   useEffect(() => {
   if (params.spellReset === "true") {
@@ -224,9 +252,16 @@ async function googleLogin() {
 
         <Text style={styles.or}>or</Text>
 
-        <TouchableOpacity style={styles.googleBtn} onPress={googleLogin}> 
-          <Text style={styles.googleText}>Continue with Google 🪄</Text> 
-          </TouchableOpacity>
+        <TouchableOpacity
+  style={[styles.googleBtn, googleLoading && { opacity: 0.6 }]}
+  onPress={googleLogin}
+  disabled={googleLoading}
+>
+  <Text style={styles.googleText}>
+    {googleLoading ? "Signing in with Google..." : "Continue with Google 🪄"}
+  </Text>
+</TouchableOpacity>
+
 
         <Text style={styles.footer}>
           New to magic? <Text style={styles.link} onPress={() => router.push("/signup")}>
@@ -360,26 +395,29 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   or: {
-    textAlign: "center",
-    color: colors.softGold,
-    marginVertical: 20,
-  },
+  textAlign: "center",
+  color: colors.softGold,
+  marginTop: 18,
+  marginBottom: 12,
+},
   footer: {
-    textAlign: "center",
-    color: colors.softGold,
-  },
+  textAlign: "center",
+  color: colors.softGold,
+  marginTop: 22,     // ✅ gives clean gap
+},
   link: {
     color: colors.gold,
     fontWeight: "bold",
   },
-  googleBtn: {
-  marginTop: 14,
+ googleBtn: {
   borderWidth: 1,
   borderColor: colors.gold,
   backgroundColor: "rgba(255,255,255,0.05)",
-  padding: 14,
+  paddingVertical: 14,
+  paddingHorizontal: 14,
   borderRadius: 14,
 },
+
 googleText: {
   color: colors.gold,
   fontFamily: "Harry",
