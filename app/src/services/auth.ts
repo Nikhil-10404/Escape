@@ -2,6 +2,8 @@ import * as SecureStore from "expo-secure-store";
 import axios from "axios";
 import { API } from "../config/api";
 import { firebaseAuth } from "../config/firebase";
+import { getDeviceId, getDeviceInfo } from "../utils/device";
+
 
 export async function signup(data: {
   fullName: string;
@@ -13,10 +15,22 @@ export async function signup(data: {
 }
 
 export async function login(email: string, password: string) {
-  const res = await axios.post(`${API}/login`, { email, password });
+  const deviceId = await getDeviceId();
+  const { deviceName, platform, appVersion } = getDeviceInfo();
+
+  const res = await axios.post(`${API}/login`, {
+    email,
+    password,
+    deviceId,
+    deviceName,
+    platform,
+    appVersion,
+  });
+
   await SecureStore.setItemAsync("token", res.data.token);
   return res.data.user;
 }
+
 
 export async function getToken() {
   return await SecureStore.getItemAsync("token");
@@ -48,15 +62,51 @@ export const verifySignupOTP = (email: string, otp: string) =>
 
 export async function firebaseGoogleLoginAPI() {
   const idToken = await firebaseAuth.currentUser?.getIdToken();
-
   if (!idToken) throw new Error("Firebase ID token missing");
 
-  const res = await axios.post(`${API}/firebase-google-login`, { idToken });
+  const deviceId = await getDeviceId();
+  const { deviceName, platform, appVersion } = getDeviceInfo();
+
+  const res = await axios.post(`${API}/firebase-google-login`, {
+    idToken,
+    deviceId,
+    deviceName,
+    platform,
+    appVersion,
+  });
 
   await SecureStore.setItemAsync("token", res.data.token);
-
   return res.data.user;
 }
+
+export async function getSessions() {
+  const token = await getToken();
+  const res = await axios.get(`${API}/sessions`, {
+    headers: { Authorization: token },
+  });
+  return res.data;
+}
+
+export async function logoutSession(sessionId: string) {
+  const token = await getToken();
+  const res = await axios.post(
+    `${API}/sessions/logout/${sessionId}`,
+    {},
+    { headers: { Authorization: token } }
+  );
+  return res.data;
+}
+
+export async function logoutAllSessions() {
+  const token = await getToken();
+  const res = await axios.post(
+    `${API}/sessions/logout-all`,
+    {},
+    { headers: { Authorization: token } }
+  );
+  return res.data;
+}
+
 
 export async function getProfile() {
   const token = await getToken();

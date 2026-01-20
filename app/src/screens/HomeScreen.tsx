@@ -54,6 +54,13 @@ export default function HomeScreen() {
       >
         <Text style={styles.buttonText}>Logout</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+  style={[styles.button, { marginTop: 14 }]}
+  onPress={() => router.push("/(auth)/manage-devices")}
+>
+  <Text style={styles.buttonText}>Manage Devices 🪄</Text>
+</TouchableOpacity>
+
     </View>
   );
 }
