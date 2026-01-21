@@ -3,7 +3,7 @@ import axios from "axios";
 import { API } from "../config/api";
 import { firebaseAuth } from "../config/firebase";
 import { getDeviceId, getDeviceInfo } from "../utils/device";
-
+import { getPreciseLocationPayload } from "../utils/location";
 
 export async function signup(data: {
   fullName: string;
@@ -17,6 +17,7 @@ export async function signup(data: {
 export async function login(email: string, password: string) {
   const deviceId = await getDeviceId();
   const { deviceName, platform, appVersion } = getDeviceInfo();
+  const location = await getPreciseLocationPayload();
 
   const res = await axios.post(`${API}/login`, {
     email,
@@ -25,6 +26,7 @@ export async function login(email: string, password: string) {
     deviceName,
     platform,
     appVersion,
+    location,
   });
 
   await SecureStore.setItemAsync("token", res.data.token);
@@ -66,6 +68,7 @@ export async function firebaseGoogleLoginAPI() {
 
   const deviceId = await getDeviceId();
   const { deviceName, platform, appVersion } = getDeviceInfo();
+  const location = await getPreciseLocationPayload();
 
   const res = await axios.post(`${API}/firebase-google-login`, {
     idToken,
@@ -73,6 +76,7 @@ export async function firebaseGoogleLoginAPI() {
     deviceName,
     platform,
     appVersion,
+    location,
   });
 
   await SecureStore.setItemAsync("token", res.data.token);
@@ -104,6 +108,44 @@ export async function logoutAllSessions() {
     {},
     { headers: { Authorization: token } }
   );
+  return res.data;
+}
+
+export async function linkGoogleAPI(firebaseIdToken: string, password: string) {
+  const token = await getToken(); // ✅ YOUR APP JWT from SecureStore
+
+  if (!token) throw new Error("App token missing. Please login again.");
+
+  const res = await axios.post(
+    `${API}/link-google`,
+    { firebaseIdToken, password },
+    { headers: { Authorization: token } } // ✅ correct
+  );
+
+  return res.data;
+}
+
+export async function setPasswordAPI(newPassword: string) {
+  const token = await getToken();
+
+  const res = await axios.post(
+    `${API}/set-password`,
+    { newPassword },
+    { headers: { Authorization: token } }
+  );
+
+  return res.data;
+}
+
+export async function unlinkGoogleAPI(password: string) {
+  const token = await getToken();
+
+  const res = await axios.post(
+    `${API}/unlink-google`,
+    { password },
+    { headers: { Authorization: token } }
+  );
+
   return res.data;
 }
 

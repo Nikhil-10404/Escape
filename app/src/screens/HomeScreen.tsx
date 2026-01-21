@@ -61,6 +61,14 @@ export default function HomeScreen() {
   <Text style={styles.buttonText}>Manage Devices 🪄</Text>
 </TouchableOpacity>
 
+<TouchableOpacity
+  style={[styles.button, { marginTop: 14 }]}
+  onPress={() => router.push("./settings")}
+>
+  <Text style={styles.buttonText}>Settings ⚙️</Text>
+</TouchableOpacity>
+
+
     </View>
   );
 }

@@ -142,6 +142,15 @@ export default function ManageDevices() {
               </Text>
 
               <Text style={styles.deviceInfo}>
+  Location:{" "}
+  {item.location?.city
+    ? `${item.location.city}, ${item.location.region}, ${item.location.country}`
+    : "Unknown"}
+</Text>
+
+<Text style={styles.deviceInfo}>IP: {item.ip || "Unknown"}</Text>
+
+              <Text style={styles.deviceInfo}>
                 Last used: {new Date(item.lastUsedAt).toLocaleString()}
               </Text>
 
