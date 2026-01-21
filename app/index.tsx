@@ -1,7 +1,8 @@
 import { Redirect } from "expo-router";
 import { useEffect, useState } from "react";
 import * as Location from "expo-location";
-import { getToken } from "./src/services/auth";
+import * as SecureStore from "expo-secure-store";
+import { refreshAccessToken } from "./src/services/auth";
 
 export default function Index() {
   const [loading, setLoading] = useState(true);
@@ -11,16 +12,35 @@ export default function Index() {
   useEffect(() => {
     async function boot() {
       try {
-        // ✅ 1) Check token
-        const token = await getToken();
-        setLoggedIn(!!token);
-
-        // ✅ 2) Check location permission
+        // ✅ 1) Check location permission
         const { status } = await Location.getForegroundPermissionsAsync();
-        setLocationAllowed(status === "granted");
+        const allowed = status === "granted";
+        setLocationAllowed(allowed);
+
+        if (!allowed) {
+          setLoading(false);
+          return;
+        }
+
+        // ✅ 2) Check refresh token
+        const refreshToken = await SecureStore.getItemAsync("refreshToken");
+
+        if (!refreshToken) {
+          setLoggedIn(false);
+          setLoading(false);
+          return;
+        }
+
+        // ✅ 3) Refresh access token automatically
+        await refreshAccessToken();
+
+        // ✅ 4) If refresh success → user is logged in
+        setLoggedIn(true);
       } catch (err) {
+        // ✅ refresh failed or error → logout fully
+        await SecureStore.deleteItemAsync("accessToken");
+        await SecureStore.deleteItemAsync("refreshToken");
         setLoggedIn(false);
-        setLocationAllowed(false);
       } finally {
         setLoading(false);
       }
@@ -31,15 +51,9 @@ export default function Index() {
 
   if (loading) return null;
 
-  // ✅ If location not allowed → go to gate screen
   if (!locationAllowed) {
-    return <Redirect href="./location-gate" />;
+    return <Redirect href="/location-gate" />;
   }
 
-  // ✅ If location allowed → normal flow
-  if (loggedIn) {
-    return <Redirect href="/home" />;
-  } else {
-    return <Redirect href="/login" />;
-  }
+  return loggedIn ? <Redirect href="/home" /> : <Redirect href="/login" />;
 }

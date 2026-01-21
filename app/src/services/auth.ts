@@ -4,6 +4,10 @@ import { API } from "../config/api";
 import { firebaseAuth } from "../config/firebase";
 import { getDeviceId, getDeviceInfo } from "../utils/device";
 import { getPreciseLocationPayload } from "../utils/location";
+import { apiClient } from "./http";
+
+const ACCESS_KEY = "accessToken";
+const REFRESH_KEY = "refreshToken";
 
 export async function signup(data: {
   fullName: string;
@@ -29,18 +33,22 @@ export async function login(email: string, password: string) {
     location,
   });
 
-  await SecureStore.setItemAsync("token", res.data.token);
+  await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
+  await SecureStore.setItemAsync(REFRESH_KEY, res.data.refreshToken);
   return res.data.user;
 }
 
 
 export async function getToken() {
-  return await SecureStore.getItemAsync("token");
+  return await SecureStore.getItemAsync(ACCESS_KEY);
 }
 
+
 export async function logout() {
-  await SecureStore.deleteItemAsync("token");
+  await SecureStore.deleteItemAsync(ACCESS_KEY);
+  await SecureStore.deleteItemAsync(REFRESH_KEY);
 }
+
 
 export const sendForgotOTP = (email: string) =>
   axios.post(`${API}/forgot-spell`, { email });
@@ -79,37 +87,56 @@ export async function firebaseGoogleLoginAPI() {
     location,
   });
 
-  await SecureStore.setItemAsync("token", res.data.token);
+ await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
+  await SecureStore.setItemAsync(REFRESH_KEY, res.data.refreshToken);
   return res.data.user;
 }
 
+// export async function getSessions() {
+//   const token = await getToken();
+//   const res = await axios.get(`${API}/sessions`, {
+//     headers: { Authorization: token },
+//   });
+//   return res.data;
+// }
+
 export async function getSessions() {
-  const token = await getToken();
-  const res = await axios.get(`${API}/sessions`, {
-    headers: { Authorization: token },
-  });
+  const res = await apiClient.get(`/sessions`);
   return res.data;
 }
 
+
+
+// export async function logoutSession(sessionId: string) {
+//   const token = await getToken();
+//   const res = await axios.post(
+//     `${API}/sessions/logout/${sessionId}`,
+//     {},
+//     { headers: { Authorization: token } }
+//   );
+//   return res.data;
+// }
+
+// export async function logoutAllSessions() {
+//   const token = await getToken();
+//   const res = await axios.post(
+//     `${API}/sessions/logout-all`,
+//     {},
+//     { headers: { Authorization: token } }
+//   );
+//   return res.data;
+// }
+
 export async function logoutSession(sessionId: string) {
-  const token = await getToken();
-  const res = await axios.post(
-    `${API}/sessions/logout/${sessionId}`,
-    {},
-    { headers: { Authorization: token } }
-  );
+  const res = await apiClient.post(`/sessions/logout/${sessionId}`, {});
   return res.data;
 }
 
 export async function logoutAllSessions() {
-  const token = await getToken();
-  const res = await axios.post(
-    `${API}/sessions/logout-all`,
-    {},
-    { headers: { Authorization: token } }
-  );
+  const res = await apiClient.post(`/sessions/logout-all`, {});
   return res.data;
 }
+
 
 export async function linkGoogleAPI(firebaseIdToken: string, password: string) {
   const token = await getToken(); // ✅ YOUR APP JWT from SecureStore
@@ -149,11 +176,32 @@ export async function unlinkGoogleAPI(password: string) {
   return res.data;
 }
 
+export async function refreshAccessToken() {
+  const refreshToken = await SecureStore.getItemAsync(REFRESH_KEY);
+  if (!refreshToken) throw new Error("No refresh token");
+
+  const res = await axios.post(
+    `${API}/refresh`,
+    {},
+    { headers: { Authorization: `Bearer ${refreshToken}` } }
+  );
+
+  await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
+  await SecureStore.setItemAsync(REFRESH_KEY, res.data.refreshToken);
+
+  return res.data.accessToken;
+}
+
+// export async function getProfile() {
+//   const token = await getToken();
+//   const res = await axios.get(`${API}/me`, {
+//     headers: { Authorization: token },
+//   });
+//   return res.data;
+// }
 
 export async function getProfile() {
-  const token = await getToken();
-  const res = await axios.get(`${API}/me`, {
-    headers: { Authorization: token },
-  });
+  const res = await apiClient.get(`/me`);
   return res.data;
 }
+
