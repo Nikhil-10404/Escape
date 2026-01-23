@@ -56,26 +56,33 @@ async function googleLogin() {
 
     await GoogleSignin.hasPlayServices();
 
-    // ✅ Force chooser every time (but don’t reset firebase first)
+    // ✅ Force chooser every time
     await GoogleSignin.signOut();
 
     const userInfo = await GoogleSignin.signIn();
 
-    const idToken =
-      (userInfo as any)?.idToken ||
-      (userInfo as any)?.data?.idToken;
+    const idToken = (userInfo as any)?.idToken || (userInfo as any)?.data?.idToken;
 
-    // ✅ User dismissed → smooth exit
-    if (!idToken) {
-      setGoogleLoading(false);
-      return;
-    }
+    // ✅ User dismissed
+    if (!idToken) return;
 
+    // ✅ Convert Google token -> Firebase token
     const credential = GoogleAuthProvider.credential(idToken);
     await signInWithCredential(firebaseAuth, credential);
 
-    await firebaseGoogleLoginAPI();
+    // ✅ Backend login (may return requires2FA)
+    const data = await firebaseGoogleLoginAPI();
 
+    // ✅ If TOTP is enabled -> go verify screen
+    if (data?.requires2FA) {
+      router.replace({
+        pathname: "./totp-verify",
+        params: { tempLoginToken: data.tempLoginToken },
+      });
+      return;
+    }
+
+    // ✅ normal success
     setAlert({
       visible: true,
       title: "✨ Welcome Wizard",
@@ -83,7 +90,7 @@ async function googleLogin() {
     });
     setAlertAction("login-success");
   } catch (err: any) {
-    // ✅ cancel/dismiss -> do nothing (smooth)
+    // ✅ cancel/dismiss -> do nothing
     if (
       err?.code === "SIGN_IN_CANCELLED" ||
       err?.message?.toLowerCase()?.includes("cancel") ||
@@ -104,7 +111,6 @@ async function googleLogin() {
     setGoogleLoading(false);
   }
 }
-
 
 
   useEffect(() => {
@@ -153,10 +159,20 @@ async function googleLogin() {
     };
     }, []);
 
-  async function login() {
+async function login() {
   try {
-    await loginAPI(email, password);
+    const data = await loginAPI(email, password);
 
+    // ✅ If TOTP required -> go verify screen
+    if (data?.requires2FA) {
+      router.replace({
+        pathname: "./totp-verify",
+        params: { tempLoginToken: data.tempLoginToken },
+      });
+      return;
+    }
+
+    // ✅ Normal login success
     setAlert({
       visible: true,
       title: "✨ Welcome Back",
@@ -164,7 +180,7 @@ async function googleLogin() {
     });
     setSuccess(true);
     setAlertAction("login-success");
-    }catch (err: any) {
+  } catch (err: any) {
     const errorMsg = err.response?.data?.error;
 
     if (errorMsg === "Wizard not found") {
@@ -173,33 +189,31 @@ async function googleLogin() {
         title: "Wizard Unknown",
         message: "No wizard is registered with this owl post address.",
       });
-    } 
-    else if (errorMsg === "Wrong secret spell") {
+    } else if (errorMsg === "Wrong secret spell") {
       setAlert({
         visible: true,
         title: "Wrong Spell",
         message: "The secret spell does not match our records.",
       });
-    } 
-    else if (errorMsg === "Use Google login") {
-    setAlert({
-      visible: true,
-      title: "🪄 Google Wizard Detected",
-      message: "This owl post is linked to Google. Please use Google Login.",
-    });
-  }
-    else {
+    } else if (errorMsg === "Use Google login") {
+      setAlert({
+        visible: true,
+        title: "🪄 Google Wizard Detected",
+        message: "This owl post is linked to Google. Please use Google Login.",
+      });
+    } else {
       setAlert({
         visible: true,
         title: "Dark Magic Interference",
-        message: "Something went wrong. Please try again.",
+        message: errorMsg || "Something went wrong. Please try again.",
       });
-      }
+    }
 
     setSuccess(false);
     setAlertAction("error");
-    }
-    }
+  }
+}
+
 
   return (
     <ImageBackground source={require("../assets/bg.jpeg")} style={styles.bg} resizeMode="cover">

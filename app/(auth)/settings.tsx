@@ -18,7 +18,8 @@ import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { firebaseAuth } from "../src/config/firebase";
 import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
 import { unlinkGoogleAPI } from "../src/services/auth";
-
+import {regenerateBackupCodesAPI} from "../src/services/auth";
+import {downloadBackupCodesPdf} from "../src/utils/backupPdf"
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -32,7 +33,10 @@ export default function SettingsScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const strength=getStrength(newPassword);
   const [unlinkLoading, setUnlinkLoading] = useState(false);
-  
+  const [regenCode, setRegenCode] = useState("");
+const [regenLoading, setRegenLoading] = useState(false);
+const [regenCodes, setRegenCodes] = useState<string[]>([]);
+const canRegen = profile?.backupCodesLeft === 0;
 
   const [alert, setAlert] = useState({
     visible: false,
@@ -388,6 +392,123 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </View>
         )}
+
+        {!profile?.twoFactorEnabled && (
+  <TouchableOpacity style={styles.btn2} onPress={() => router.push("./totp-setup")}>
+    <Text style={styles.btn2Text}>Enable Authenticator 2FA 🛡️</Text>
+  </TouchableOpacity>
+)}
+
+{profile?.twoFactorEnabled && (
+  <TouchableOpacity style={styles.btn2} onPress={() => router.push("./totp-disable")}>
+    <Text style={styles.btn2Text}>Disable 2FA 🧹</Text>
+  </TouchableOpacity>
+)}
+
+{profile?.twoFactorEnabled && profile?.twoFactorMethod === "totp" && (
+  <View style={styles.card}>
+    <Text style={styles.cardTitle}>📜 Backup Scroll Controls</Text>
+
+    <Text style={styles.cardSub}>
+      Backup codes help you enter your vault if you lose your Authenticator wand.
+    </Text>
+
+    <Text style={styles.label}>
+      Enter your Authenticator 6-digit code to regenerate backup scroll. But you can only regenerate backup scroll only when all the codes have been expired.
+    </Text>
+
+    <TextInput
+      style={styles.input}
+      placeholder="123456"
+      placeholderTextColor="#999"
+      keyboardType="numeric"
+      maxLength={6}
+      value={regenCode}
+      onChangeText={setRegenCode}
+    />
+
+    <TouchableOpacity
+      style={[styles.btn2, regenLoading && { opacity: 0.6 }]}
+      disabled={
+  regenLoading ||
+  regenCode.trim().length !== 6 ||
+  !canRegen
+}
+      onPress={async () => {
+        try {
+          setRegenLoading(true);
+
+          const data = await regenerateBackupCodesAPI(regenCode.trim());
+
+          setRegenCodes(data.backupCodes || []);
+          setRegenCode("");
+
+          setAlert({
+            visible: true,
+            title: "✨ Backup Scroll Reforged",
+            message:
+              "New backup codes have been generated.\nOld codes are now destroyed.",
+          });
+
+          loadProfile();
+        } catch (err: any) {
+          setAlert({
+            visible: true,
+            title: "Dark Magic Blocked",
+            message:
+              err?.response?.data?.error ||
+              err?.message ||
+              "Failed to regenerate backup codes",
+          });
+        } finally {
+          setRegenLoading(false);
+        }
+      }}
+    >
+      <Text style={styles.btn2Text}>
+  {!canRegen
+    ? `Backup Codes Left: ${profile?.backupCodesLeft || 0}`
+    : regenLoading
+    ? "Reforging..."
+    : "Regenerate Backup Codes ⚡"}
+</Text>
+
+    </TouchableOpacity>
+
+    {/* ✅ Download newly generated codes */}
+    {regenCodes.length > 0 && (
+      <TouchableOpacity
+        style={[styles.button, { marginTop: 12 }]}
+        onPress={async () => {
+          try {
+            setRegenLoading(true);
+            await downloadBackupCodesPdf(regenCodes, profile?.fullName || "Wizard");
+
+            setAlert({
+              visible: true,
+              title: "📜 Backup Scroll Saved",
+              message:
+                "Keep it safe. These codes can recover your account if you lose your wand (Authenticator).",
+            });
+          } catch (err: any) {
+            setAlert({
+              visible: true,
+              title: "Dark Magic Interference",
+              message: err?.message || "Failed to download backup scroll",
+            });
+          } finally {
+            setRegenLoading(false);
+          }
+        }}
+      >
+        <Text style={styles.buttonText}>
+          {regenLoading ? "Preparing your scroll..." : "Download Backup Scroll 📜"}
+        </Text>
+      </TouchableOpacity>
+    )}
+  </View>
+)}
+
 
         {/* ✅ fallback (should not happen much) */}
         {!showLinkGoogle && !showSetPassword && !(hasGoogle && hasPassword) && (

@@ -8,6 +8,7 @@ import { apiClient } from "./http";
 
 const ACCESS_KEY = "accessToken";
 const REFRESH_KEY = "refreshToken";
+const BACKUP_LEFT_KEY = "backupCodesLeft";
 
 export async function signup(data: {
   fullName: string;
@@ -32,6 +33,10 @@ export async function login(email: string, password: string) {
     appVersion,
     location,
   });
+
+  if (res.data.requires2FA) {
+    return res.data;
+  }
 
   await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
   await SecureStore.setItemAsync(REFRESH_KEY, res.data.refreshToken);
@@ -86,6 +91,10 @@ export async function firebaseGoogleLoginAPI() {
     appVersion,
     location,
   });
+
+  if (res.data.requires2FA) {
+    return res.data;
+  }
 
  await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
   await SecureStore.setItemAsync(REFRESH_KEY, res.data.refreshToken);
@@ -191,6 +200,74 @@ export async function refreshAccessToken() {
 
   return res.data.accessToken;
 }
+
+export async function totpSetupAPI() {
+  const res = await apiClient.post(`${API}/2fa/totp/setup`, {});
+  return res.data;
+}
+
+export async function totpConfirmAPI(code: string) {
+  const res = await apiClient.post(`${API}/2fa/totp/confirm`, { code });
+  return res.data;
+}
+
+export async function totpVerifyLoginAPI(tempLoginToken: string, code: string) {
+  const res = await axios.post(`${API}/2fa/totp/verify-login`, {
+    tempLoginToken,
+    code,
+  });
+
+  await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
+  await SecureStore.setItemAsync(REFRESH_KEY, res.data.refreshToken);
+
+  // ✅ NEW: store backup left
+  if (typeof res.data.backupCodesLeft === "number") {
+    await saveBackupCodesLeft(res.data.backupCodesLeft);
+  }
+
+  return res.data;
+}
+
+export async function totpDisableAPI(password: string, code: string) {
+  const res = await apiClient.post(`${API}/2fa/totp/disable`, { password, code });
+  return res.data;
+}
+
+export async function backupLoginAPI(tempLoginToken: string, backupCode: string) {
+  const res = await axios.post(`${API}/backup-login`, {
+    tempLoginToken,
+    backupCode,
+  });
+
+  await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
+  await SecureStore.setItemAsync(REFRESH_KEY, res.data.refreshToken);
+
+  // ✅ NEW: store backup left
+  if (typeof res.data.backupCodesLeft === "number") {
+    await saveBackupCodesLeft(res.data.backupCodesLeft);
+  }
+
+  return res.data;
+}
+
+
+
+
+export async function saveBackupCodesLeft(count: number) {
+  await SecureStore.setItemAsync(BACKUP_LEFT_KEY, String(count));
+}
+
+export async function getBackupCodesLeft() {
+  const v = await SecureStore.getItemAsync(BACKUP_LEFT_KEY);
+  return v ? Number(v) : null;
+}
+
+export async function regenerateBackupCodesAPI(code: string) {
+  const res = await apiClient.post(`${API}/totp/regenerate-backup-codes`, { code });
+  return res.data;
+}
+
+
 
 // export async function getProfile() {
 //   const token = await getToken();
