@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import * as Location from "expo-location";
 import * as SecureStore from "expo-secure-store";
 import { refreshAccessToken } from "./src/services/auth";
+import { View, Text } from "react-native";
 
 export default function Index() {
   const [loading, setLoading] = useState(true);
@@ -49,7 +50,13 @@ export default function Index() {
     boot();
   }, []);
 
-  if (loading) return null;
+  if (loading) {
+  return (
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <Text>Summoning your magic...</Text>
+    </View>
+  );
+};
 
   if (!locationAllowed) {
     return <Redirect href="/location-gate" />;

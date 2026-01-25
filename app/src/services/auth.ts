@@ -4,7 +4,7 @@ import { API } from "../config/api";
 import { firebaseAuth } from "../config/firebase";
 import { getDeviceId, getDeviceInfo } from "../utils/device";
 import { getPreciseLocationPayload } from "../utils/location";
-import { apiClient } from "./http";
+import { apiClient, publicClient } from "./http";
 
 const ACCESS_KEY = "accessToken";
 const REFRESH_KEY = "refreshToken";
@@ -16,7 +16,7 @@ export async function signup(data: {
   email: string;
   password: string;
 }) {
-  const res = await apiClient.post(`/signup`, data);
+  const res = await publicClient.post(`/signup`, data);
   return res.data;
 }
 
@@ -26,7 +26,7 @@ export async function login(email: string, password: string) {
   const { deviceName, platform, appVersion } = getDeviceInfo();
   const location = await getPreciseLocationPayload();
 
-  const res = await apiClient.post(`/login`, {
+  const res = await  publicClient.post(`/login`, {
     email,
     password,
     deviceId,
@@ -56,7 +56,7 @@ export async function firebaseGoogleLoginAPI() {
   const { deviceName, platform, appVersion } = getDeviceInfo();
   const location = await getPreciseLocationPayload();
 
-  const res = await apiClient.post(`/firebase-google-login`, {
+  const res = await publicClient.post(`/firebase-google-login`, {
     idToken,
     deviceId,
     deviceName,
@@ -82,13 +82,10 @@ export async function getToken() {
 
 export async function logout() {
   try {
-    // ✅ kill session in DB
     await apiClient.post(`/logout`);
   } catch (err) {
-    // even if backend fails, still clear tokens locally
     console.log("logout api error:", err);
   } finally {
-    // ✅ always clear local tokens
     await SecureStore.deleteItemAsync(ACCESS_KEY);
     await SecureStore.deleteItemAsync(REFRESH_KEY);
     await SecureStore.deleteItemAsync(BACKUP_LEFT_KEY);
@@ -98,21 +95,21 @@ export async function logout() {
 
 // ✅ Forgot Password
 export const sendForgotOTP = (email: string) =>
-  apiClient.post(`/forgot-spell`, { email });
+  publicClient.post(`/forgot-spell`, { email });
 
 export const verifyOTP = (email: string, otp: string) =>
-  apiClient.post(`/verify-otp`, { email, otp });
+  publicClient.post(`/verify-otp`, { email, otp });
 
 export async function resetSpell(resetToken: string, password: string) {
-  const res = await apiClient.post(`/reset-spell`, { resetToken, password });
+  const res = await publicClient.post(`/reset-spell`, { resetToken, password });
   return res.data;
 }
 
 export const resendSignupOTP = (email: string) =>
-  apiClient.post(`/resend-signup-otp`, { email });
+  publicClient.post(`/resend-signup-otp`, { email });
 
 export const verifySignupOTP = (email: string, otp: string) =>
-  apiClient.post(`/verify-signup-otp`, { email, otp });
+  publicClient.post(`/verify-signup-otp`, { email, otp });
 
 // ✅ Sessions (protected)
 export async function getSessions() {
@@ -159,7 +156,7 @@ export async function unlinkGoogleAPI(password: string) {
 export async function setPasswordAPI(newPassword: string) {
   const token = await getToken();
 
-  const res = await axios.post(
+  const res = await apiClient.post(
     `${API}/set-password`,
     { newPassword },
     { headers: { Authorization: token } }
@@ -173,7 +170,7 @@ export async function refreshAccessToken() {
   const refreshToken = await SecureStore.getItemAsync(REFRESH_KEY);
   if (!refreshToken) throw new Error("No refresh token");
 
-  const res = await apiClient.post(
+  const res = await publicClient.post(
     `/refresh`,
     {},
     { headers: { Authorization: `Bearer ${refreshToken}` } }
@@ -204,14 +201,30 @@ export async function totpConfirmAPI(code: string) {
 export async function totpVerifyLoginAPI(tempLoginToken: string, code: string) {
   const deviceId = await getDeviceId();
 
-  const res = await apiClient.post(
-    `${API}/2fa/totp/verify-login`,
+  const res = await publicClient.post(
+    `/2fa/totp/verify-login`,
     { tempLoginToken, code },
-    {
-      headers: {
-        "x-device-id": deviceId,
-      },
-    }
+    { headers: { "x-device-id": deviceId } }
+  );
+
+  await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
+  await SecureStore.setItemAsync(REFRESH_KEY, res.data.refreshToken);
+
+  if (typeof res.data.backupCodesLeft === "number") {
+    await saveBackupCodesLeft(res.data.backupCodesLeft);
+  }
+
+  return res.data;
+}
+
+// ✅ Backup login (public)
+export async function backupLoginAPI(tempLoginToken: string, backupCode: string) {
+  const deviceId = await getDeviceId();
+
+  const res = await publicClient.post(
+    `/backup-login`,
+    { tempLoginToken, backupCode },
+    { headers: { "x-device-id": deviceId } }
   );
 
   await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
@@ -227,30 +240,6 @@ export async function totpVerifyLoginAPI(tempLoginToken: string, code: string) {
 // ✅ Disable 2FA (protected)
 export async function totpDisableAPI(password: string, code: string) {
   const res = await apiClient.post(`/2fa/totp/disable`, { password, code });
-  return res.data;
-}
-
-// ✅ Backup login (public route but needs x-device-id manually)
-export async function backupLoginAPI(tempLoginToken: string, backupCode: string) {
-  const deviceId = await getDeviceId();
-
-  const res = await apiClient.post(
-    `${API}/backup-login`,
-    { tempLoginToken, backupCode },
-    {
-      headers: {
-        "x-device-id": deviceId,
-      },
-    }
-  );
-
-  await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
-  await SecureStore.setItemAsync(REFRESH_KEY, res.data.refreshToken);
-
-  if (typeof res.data.backupCodesLeft === "number") {
-    await saveBackupCodesLeft(res.data.backupCodesLeft);
-  }
-
   return res.data;
 }
 
