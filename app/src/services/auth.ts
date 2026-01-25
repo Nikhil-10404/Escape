@@ -10,23 +10,54 @@ const ACCESS_KEY = "accessToken";
 const REFRESH_KEY = "refreshToken";
 const BACKUP_LEFT_KEY = "backupCodesLeft";
 
+// ✅ Signup (public)
 export async function signup(data: {
   fullName: string;
   email: string;
   password: string;
 }) {
-  const res = await axios.post(`${API}/signup`, data);
+  const res = await apiClient.post(`/signup`, data);
   return res.data;
 }
 
+// ✅ Normal Login (public)
 export async function login(email: string, password: string) {
   const deviceId = await getDeviceId();
   const { deviceName, platform, appVersion } = getDeviceInfo();
   const location = await getPreciseLocationPayload();
 
-  const res = await axios.post(`${API}/login`, {
+  const res = await apiClient.post(`/login`, {
     email,
     password,
+    deviceId,
+    deviceName,
+    platform,
+    appVersion,
+    location,
+  });
+
+  // ✅ if 2FA required -> return temp token
+  if (res.data.requires2FA) {
+    return res.data;
+  }
+
+  // ✅ store tokens
+  await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
+  await SecureStore.setItemAsync(REFRESH_KEY, res.data.refreshToken);
+
+  return res.data.user;
+}
+
+export async function firebaseGoogleLoginAPI() {
+  const idToken = await firebaseAuth.currentUser?.getIdToken();
+  if (!idToken) throw new Error("Firebase ID token missing");
+
+  const deviceId = await getDeviceId();
+  const { deviceName, platform, appVersion } = getDeviceInfo();
+  const location = await getPreciseLocationPayload();
+
+  const res = await apiClient.post(`/firebase-google-login`, {
+    idToken,
     deviceId,
     deviceName,
     platform,
@@ -40,101 +71,54 @@ export async function login(email: string, password: string) {
 
   await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
   await SecureStore.setItemAsync(REFRESH_KEY, res.data.refreshToken);
+
   return res.data.user;
 }
 
-
+// ✅ token helpers
 export async function getToken() {
   return await SecureStore.getItemAsync(ACCESS_KEY);
 }
 
-
 export async function logout() {
-  await SecureStore.deleteItemAsync(ACCESS_KEY);
-  await SecureStore.deleteItemAsync(REFRESH_KEY);
+  try {
+    // ✅ kill session in DB
+    await apiClient.post(`/logout`);
+  } catch (err) {
+    // even if backend fails, still clear tokens locally
+    console.log("logout api error:", err);
+  } finally {
+    // ✅ always clear local tokens
+    await SecureStore.deleteItemAsync(ACCESS_KEY);
+    await SecureStore.deleteItemAsync(REFRESH_KEY);
+    await SecureStore.deleteItemAsync(BACKUP_LEFT_KEY);
+  }
 }
 
 
+// ✅ Forgot Password
 export const sendForgotOTP = (email: string) =>
-  axios.post(`${API}/forgot-spell`, { email });
+  apiClient.post(`/forgot-spell`, { email });
 
 export const verifyOTP = (email: string, otp: string) =>
-  axios.post(`${API}/verify-otp`, { email, otp });
+  apiClient.post(`/verify-otp`, { email, otp });
 
 export async function resetSpell(resetToken: string, password: string) {
-  const res = await axios.post(`${API}/reset-spell`, {
-    resetToken,
-    password,
-  });
+  const res = await apiClient.post(`/reset-spell`, { resetToken, password });
   return res.data;
 }
 
 export const resendSignupOTP = (email: string) =>
-  axios.post(`${API}/resend-signup-otp`, { email });
+  apiClient.post(`/resend-signup-otp`, { email });
 
 export const verifySignupOTP = (email: string, otp: string) =>
-  axios.post(`${API}/verify-signup-otp`, { email, otp });
+  apiClient.post(`/verify-signup-otp`, { email, otp });
 
-export async function firebaseGoogleLoginAPI() {
-  const idToken = await firebaseAuth.currentUser?.getIdToken();
-  if (!idToken) throw new Error("Firebase ID token missing");
-
-  const deviceId = await getDeviceId();
-  const { deviceName, platform, appVersion } = getDeviceInfo();
-  const location = await getPreciseLocationPayload();
-
-  const res = await axios.post(`${API}/firebase-google-login`, {
-    idToken,
-    deviceId,
-    deviceName,
-    platform,
-    appVersion,
-    location,
-  });
-
-  if (res.data.requires2FA) {
-    return res.data;
-  }
-
- await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
-  await SecureStore.setItemAsync(REFRESH_KEY, res.data.refreshToken);
-  return res.data.user;
-}
-
-// export async function getSessions() {
-//   const token = await getToken();
-//   const res = await axios.get(`${API}/sessions`, {
-//     headers: { Authorization: token },
-//   });
-//   return res.data;
-// }
-
+// ✅ Sessions (protected)
 export async function getSessions() {
   const res = await apiClient.get(`/sessions`);
   return res.data;
 }
-
-
-
-// export async function logoutSession(sessionId: string) {
-//   const token = await getToken();
-//   const res = await axios.post(
-//     `${API}/sessions/logout/${sessionId}`,
-//     {},
-//     { headers: { Authorization: token } }
-//   );
-//   return res.data;
-// }
-
-// export async function logoutAllSessions() {
-//   const token = await getToken();
-//   const res = await axios.post(
-//     `${API}/sessions/logout-all`,
-//     {},
-//     { headers: { Authorization: token } }
-//   );
-//   return res.data;
-// }
 
 export async function logoutSession(sessionId: string) {
   const res = await apiClient.post(`/sessions/logout/${sessionId}`, {});
@@ -146,16 +130,27 @@ export async function logoutAllSessions() {
   return res.data;
 }
 
-
+// ✅ Link/Unlink Google (protected)
 export async function linkGoogleAPI(firebaseIdToken: string, password: string) {
-  const token = await getToken(); // ✅ YOUR APP JWT from SecureStore
-
+  const token = await getToken();
   if (!token) throw new Error("App token missing. Please login again.");
 
-  const res = await axios.post(
-    `${API}/link-google`,
+  const res = await apiClient.post(
+    `/link-google`,
     { firebaseIdToken, password },
-    { headers: { Authorization: token } } // ✅ correct
+    { headers: { Authorization: token } }
+  );
+
+  return res.data;
+}
+
+export async function unlinkGoogleAPI(password: string) {
+  const token = await getToken();
+
+  const res = await apiClient.post(
+    `/unlink-google`,
+    { password },
+    { headers: { Authorization: token } }
   );
 
   return res.data;
@@ -173,24 +168,13 @@ export async function setPasswordAPI(newPassword: string) {
   return res.data;
 }
 
-export async function unlinkGoogleAPI(password: string) {
-  const token = await getToken();
-
-  const res = await axios.post(
-    `${API}/unlink-google`,
-    { password },
-    { headers: { Authorization: token } }
-  );
-
-  return res.data;
-}
-
+// ✅ Refresh token (public)
 export async function refreshAccessToken() {
   const refreshToken = await SecureStore.getItemAsync(REFRESH_KEY);
   if (!refreshToken) throw new Error("No refresh token");
 
-  const res = await axios.post(
-    `${API}/refresh`,
+  const res = await apiClient.post(
+    `/refresh`,
     {},
     { headers: { Authorization: `Bearer ${refreshToken}` } }
   );
@@ -201,26 +185,38 @@ export async function refreshAccessToken() {
   return res.data.accessToken;
 }
 
+// ======================
+// ✅ 2FA (protected + public flows)
+// ======================
+
+// ✅ Setup (protected)
 export async function totpSetupAPI() {
-  const res = await apiClient.post(`${API}/2fa/totp/setup`, {});
+  const res = await apiClient.post(`/2fa/totp/setup`, {});
   return res.data;
 }
 
 export async function totpConfirmAPI(code: string) {
-  const res = await apiClient.post(`${API}/2fa/totp/confirm`, { code });
+  const res = await apiClient.post(`/2fa/totp/confirm`, { code });
   return res.data;
 }
 
+// ✅ Verify login (public route but needs x-device-id manually)
 export async function totpVerifyLoginAPI(tempLoginToken: string, code: string) {
-  const res = await axios.post(`${API}/2fa/totp/verify-login`, {
-    tempLoginToken,
-    code,
-  });
+  const deviceId = await getDeviceId();
+
+  const res = await apiClient.post(
+    `${API}/2fa/totp/verify-login`,
+    { tempLoginToken, code },
+    {
+      headers: {
+        "x-device-id": deviceId,
+      },
+    }
+  );
 
   await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
   await SecureStore.setItemAsync(REFRESH_KEY, res.data.refreshToken);
 
-  // ✅ NEW: store backup left
   if (typeof res.data.backupCodesLeft === "number") {
     await saveBackupCodesLeft(res.data.backupCodesLeft);
   }
@@ -228,21 +224,29 @@ export async function totpVerifyLoginAPI(tempLoginToken: string, code: string) {
   return res.data;
 }
 
+// ✅ Disable 2FA (protected)
 export async function totpDisableAPI(password: string, code: string) {
-  const res = await apiClient.post(`${API}/2fa/totp/disable`, { password, code });
+  const res = await apiClient.post(`/2fa/totp/disable`, { password, code });
   return res.data;
 }
 
+// ✅ Backup login (public route but needs x-device-id manually)
 export async function backupLoginAPI(tempLoginToken: string, backupCode: string) {
-  const res = await axios.post(`${API}/backup-login`, {
-    tempLoginToken,
-    backupCode,
-  });
+  const deviceId = await getDeviceId();
+
+  const res = await apiClient.post(
+    `${API}/backup-login`,
+    { tempLoginToken, backupCode },
+    {
+      headers: {
+        "x-device-id": deviceId,
+      },
+    }
+  );
 
   await SecureStore.setItemAsync(ACCESS_KEY, res.data.accessToken);
   await SecureStore.setItemAsync(REFRESH_KEY, res.data.refreshToken);
 
-  // ✅ NEW: store backup left
   if (typeof res.data.backupCodesLeft === "number") {
     await saveBackupCodesLeft(res.data.backupCodesLeft);
   }
@@ -250,9 +254,12 @@ export async function backupLoginAPI(tempLoginToken: string, backupCode: string)
   return res.data;
 }
 
+export async function regenerateBackupCodesAPI(code: string) {
+  const res = await apiClient.post(`/totp/regenerate-backup-codes`, { code });
+  return res.data;
+}
 
-
-
+// ✅ Backup left helpers
 export async function saveBackupCodesLeft(count: number) {
   await SecureStore.setItemAsync(BACKUP_LEFT_KEY, String(count));
 }
@@ -262,23 +269,8 @@ export async function getBackupCodesLeft() {
   return v ? Number(v) : null;
 }
 
-export async function regenerateBackupCodesAPI(code: string) {
-  const res = await apiClient.post(`${API}/totp/regenerate-backup-codes`, { code });
-  return res.data;
-}
-
-
-
-// export async function getProfile() {
-//   const token = await getToken();
-//   const res = await axios.get(`${API}/me`, {
-//     headers: { Authorization: token },
-//   });
-//   return res.data;
-// }
-
+// ✅ Profile (protected)
 export async function getProfile() {
   const res = await apiClient.get(`/me`);
   return res.data;
 }
-
