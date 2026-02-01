@@ -405,6 +405,10 @@ const canRegen = profile?.backupCodesLeft === 0;
   </TouchableOpacity>
 )}
 
+<TouchableOpacity style={styles.btn2} onPress={() => router.push("./account-activity")}>
+  <Text style={styles.btn2Text}>View Account Activity 📜</Text>
+</TouchableOpacity>
+
 {profile?.twoFactorEnabled && profile?.twoFactorMethod === "totp" && (
   <View style={styles.card}>
     <Text style={styles.cardTitle}>📜 Backup Scroll Controls</Text>

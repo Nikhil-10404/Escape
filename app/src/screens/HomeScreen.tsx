@@ -12,9 +12,12 @@ export default function HomeScreen() {
   useEffect(() => {
     async function loadProfile() {
       try {
-        const data = await getProfile();
+         console.log("CALLING /me");
+      const data = await getProfile();
+      console.log("PROFILE DATA:", data);
         setUser(data);
-      } catch {
+      } catch (err){
+        console.log("PROFILE LOAD FAILED:", err);
         // token invalid / expired
         await logout();
         router.replace("/login");

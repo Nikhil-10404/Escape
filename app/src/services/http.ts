@@ -2,6 +2,8 @@ import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 import { API } from "../config/api";
 import { getDeviceId } from "../utils/device";
+import { emitRateLimit } from "../utils/rateLimitBus";
+import { handleRateLimit } from "../utils/handleRateLimit";
 
 const ACCESS_KEY = "accessToken";
 
@@ -9,6 +11,16 @@ const ACCESS_KEY = "accessToken";
 export const publicClient = axios.create({
   baseURL: API,
 });
+
+publicClient.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    if (handleRateLimit(error)) {
+      return Promise.reject({ __rateLimited: true });
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ✅ Protected client (WITH interceptors)
 export const apiClient = axios.create({
@@ -35,7 +47,25 @@ apiClient.interceptors.request.use(async (config) => {
 apiClient.interceptors.response.use(
   (res) => res,
   async (error) => {
+    console.log("AXIOS ERROR:", {
+  url: error.config?.url,
+  status: error.response?.status,
+  data: error.response?.data,
+});
+
+      if (handleRateLimit(error)) {
+      return Promise.reject({ __rateLimited: true });
+    }
+
     const originalRequest = error.config;
+
+      if (
+  error.response?.status === 403 &&
+  error.response?.data?.requiresEmailConfirmation
+) {
+  // 🚫 DO NOT logout
+  return Promise.reject(error);
+}
 
     // ✅ prevent infinite loops
     if (error.response?.status === 401 && !originalRequest._retry) {
@@ -43,7 +73,8 @@ apiClient.interceptors.response.use(
 
       try {
         // ✅ IMPORTANT: refresh must use publicClient
-        const refreshToken = await SecureStore.getItemAsync("refreshToken");
+      
+ const refreshToken = await SecureStore.getItemAsync("refreshToken");
         if (!refreshToken) throw new Error("No refresh token");
 
         const refreshRes = await publicClient.post(

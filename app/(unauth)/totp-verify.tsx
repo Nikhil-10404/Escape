@@ -96,6 +96,16 @@ export default function TotpVerifyScreen() {
         });
       }
     } catch (err: any) {
+       if (err?.__rateLimited) {
+    return;
+  }
+  if (err?.response?.data?.requiresEmailConfirmation) {
+  router.replace({
+    pathname: "/confirm-login",
+    params: { sessionId: err.response.data.sessionId },
+  });
+  return;
+}
       setAlert({
         visible: true,
         title: "Dark Magic Blocked",

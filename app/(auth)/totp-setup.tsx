@@ -64,6 +64,9 @@ React.useEffect(() => {
 
       setStep("setup");
     } catch (err: any) {
+       if (err?.__rateLimited) {
+    return;
+  }
       console.log("BEGIN 2FA ERROR:", err?.response?.data || err?.message || err);
 
       showAlert(
@@ -162,6 +165,9 @@ const fileUri = (FS.cacheDirectory || FS.documentDirectory) + "backup_codes.txt"
         "Your wizard account is now protected by Authenticator magic."
       );
     } catch (err: any) {
+       if (err?.__rateLimited) {
+    return;
+  }
       showAlert(
         "Wrong Spell ⚡",
         err?.response?.data?.error || "Invalid authenticator code. Try the latest one."

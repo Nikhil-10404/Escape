@@ -36,6 +36,9 @@ export default function ManageDevices() {
       setSessions(data.sessions);
       setCurrentSessionId(data.currentSessionId);
     } catch (err: any) {
+       if (err?.__rateLimited) {
+    return;
+  }
       await logout();
       router.replace("/login");
     } finally {
@@ -66,6 +69,9 @@ export default function ManageDevices() {
 
       load();
     } catch (err: any) {
+       if (err?.__rateLimited) {
+    return;
+  }
       setAlert({
         visible: true,
         title: "Dark Magic Interference",
@@ -86,6 +92,9 @@ export default function ManageDevices() {
 
       load();
     } catch (err: any) {
+       if (err?.__rateLimited) {
+    return;
+  }
       setAlert({
         visible: true,
         title: "Dark Magic Interference",

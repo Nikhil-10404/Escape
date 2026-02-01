@@ -63,6 +63,9 @@ export default function ForgotSpell() {
     });
 
   } catch (e: any) {
+     if (e?.__rateLimited) {
+    return;
+  }
     const status = e?.response?.status;
     const msg = e?.response?.data?.error;
 

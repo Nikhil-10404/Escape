@@ -58,6 +58,9 @@ export default function TotpDisableScreen() {
         "Authenticator protection removed. You can enable it again anytime."
       );
     } catch (err: any) {
+       if (err?.__rateLimited) {
+    return;
+  }
       showAlert(
         "Dark Magic Blocked",
         err?.response?.data?.error || err?.message || "Failed to disable 2FA"

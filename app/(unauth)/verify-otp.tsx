@@ -59,7 +59,10 @@ async function resendOTP() {
     setOtp(["", "", "", "", "", ""]);
     setTimer(60);
     setCanResend(false);
-  } catch (err) {
+  } catch (err:any) {
+     if (err?.__rateLimited) {
+    return;
+  }
     setAlert({
       visible: true,
       title: "Dark Magic Interference",
@@ -117,6 +120,9 @@ router.replace({
 
       
     } catch (err: any) {
+       if (err?.__rateLimited) {
+    return;
+  }
       setAlert({
         visible: true,
         title: "Wrong Code",

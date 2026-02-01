@@ -74,6 +74,9 @@ export default function VerifySignupOTPScreen() {
       setTimer(60);
       setCanResend(false);
     } catch (err: any) {
+       if (err?.__rateLimited) {
+    return;
+  }
       setAlert({
         visible: true,
         title: "Dark Magic Interference",
@@ -111,6 +114,9 @@ router.replace({
       });
       setSuccess(true);
     } catch (err: any) {
+       if (err?.__rateLimited) {
+    return;
+  }
       setAlert({
         visible: true,
         title: "Wrong Code",

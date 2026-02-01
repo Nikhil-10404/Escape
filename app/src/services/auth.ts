@@ -82,7 +82,7 @@ export async function getToken() {
 
 export async function logout() {
   try {
-    await apiClient.post(`/logout`);
+    await apiClient.post(`/logout`,{});
   } catch (err) {
     console.log("logout api error:", err);
   } finally {
@@ -91,7 +91,6 @@ export async function logout() {
     await SecureStore.deleteItemAsync(BACKUP_LEFT_KEY);
   }
 }
-
 
 // ✅ Forgot Password
 export const sendForgotOTP = (email: string) =>
@@ -256,6 +255,14 @@ export async function saveBackupCodesLeft(count: number) {
 export async function getBackupCodesLeft() {
   const v = await SecureStore.getItemAsync(BACKUP_LEFT_KEY);
   return v ? Number(v) : null;
+}
+
+export async function getAuditLogs(limit = 50, cursor?: string | null) {
+  const params: any = { limit };
+  if (cursor) params.cursor = cursor;
+
+  const res = await apiClient.get(`/audit-logs`, { params });
+  return res.data as { logs: any[]; nextCursor: string | null };
 }
 
 // ✅ Profile (protected)

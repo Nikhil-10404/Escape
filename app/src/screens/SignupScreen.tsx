@@ -110,6 +110,9 @@ router.replace({
 
     setSuccess(true);
   } catch (err: any) {
+     if (err?.__rateLimited) {
+    return;
+  }
   showAlert(
     "Spell Failed",
     err.response?.data?.error || "Dark magic interfered with the spell"

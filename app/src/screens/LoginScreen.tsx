@@ -23,6 +23,7 @@ import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
 import { firebaseAuth } from "../config/firebase";
 import { firebaseGoogleLoginAPI } from "../services/auth";
+import { emitRateLimit } from "../utils/rateLimitBus";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -90,6 +91,16 @@ async function googleLogin() {
     });
     setAlertAction("login-success");
   } catch (err: any) {
+     if (err?.__rateLimited) {
+    return;
+  }
+  if (err?.response?.data?.requiresEmailConfirmation) {
+  router.replace({
+    pathname: "./confirm-login",
+    params: { sessionId: err.response.data.sessionId },
+  });
+  return;
+}
     // ✅ cancel/dismiss -> do nothing
     if (
       err?.code === "SIGN_IN_CANCELLED" ||
@@ -163,6 +174,19 @@ async function login() {
   try {
     const data = await loginAPI(email, password);
 
+    const soft = data.headers?.["x-ratelimit-soft"];
+    if (soft === "true") {
+      emitRateLimit({
+        title: "⚠️ Slow Down, Wizard",
+        message:
+          "Too many attempts detected.\nYour spell casting is being slowed.",
+        retryAfter: Number(
+          data.headers["x-ratelimit-retry-after"] || 30
+        ),
+        hard: false,
+      });
+    }
+
     // ✅ If TOTP required -> go verify screen
     if (data?.requires2FA) {
       router.replace({
@@ -181,6 +205,16 @@ async function login() {
     setSuccess(true);
     setAlertAction("login-success");
   } catch (err: any) {
+     if (err?.__rateLimited) {
+    return;
+  }
+  if (err?.response?.data?.requiresEmailConfirmation) {
+  router.replace({
+    pathname: "./confirm-login",
+    params: { sessionId: err.response.data.sessionId },
+  });
+  return;
+}
     const errorMsg = err.response?.data?.error;
 
     if (errorMsg === "Wizard not found") {

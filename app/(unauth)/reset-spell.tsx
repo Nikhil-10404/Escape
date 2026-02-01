@@ -105,6 +105,9 @@ React.useEffect(() => {
   },
 });
 } catch (err: any) {
+   if (err?.__rateLimited) {
+    return;
+  }
   const errorMsg = err.response?.data?.error;
 
   if (errorMsg === "Invalid reset session") {
